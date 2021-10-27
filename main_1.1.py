@@ -21,8 +21,8 @@ uid=pwd=''
 rnum=0 # record number
 delay=3
 app_icon='img/icon.ico'
-#citix is ued full name is not shown in citrix Ie. To support citrix title needs to be till I.
-# if we end title earlier then it can take anyother browser as main browser
+# citix is ued full name is not shown in citrix Ie. To support citrix title needs to be till I.
+# if we end title earlier then it can take any other browser as main browser
 # to make sure we are opening Internet explorer, title has to finish on I.
 
 # get screen size
@@ -77,18 +77,7 @@ def check(win):
     if err:
         print(titles)
         ui.alert('Please try again after opening RHESYS page in internet explorer')
-    '''
-    # this part is to bring window on the main screen
-    else:
-        ui.getWindowsWithTitle(title)[0].moveTo(s_width,
-                                                s_height)  # move ie window to main screen to avoid problem finding in second screen
-        ui.sleep(0.3)'''
-    '''else:
-        # check if id and password are entered or not
-        if uid!='' and pwd!='':
-            tk.Tk.destroy(win)
-        else:
-            ui.alert('Please Enter User Id and Password')'''
+
 def show_win(title): # function to activate ie window
     print('Show win')
     # this function needs to be called everytime after clicking on any button
@@ -132,16 +121,26 @@ def new_project(): # thi function is to create new project entry
     kb.send('p')
     ui.sleep(0.3)
     kb.send('p')
-
-def get_data(window,f_path): # This function reads excel file data
-    data=pd.read_excel(f_path) # open excel file
+def get_data(window,f_path,fn): # This function reads excel file data
+    if fn=='data':
+        data=pd.read_excel(f_path) # open excel file
+    else:
+        try:
+            data = pd.read_excel(f_path,'Grant Tracker')  # open excel file
+        except:
+            ui.alert('Wrong Grant Tracker File, Try again', title=w_title)
+            window.destroy()  # destroy main window
+            main_win()  # reopen main window
     cols=data.shape[1] # get number of columns
     # this feature will prevent user from selecting wrong file
-    if cols<81:
-        ui.alert('Wrong File, Try again',title=w_title)
+    if cols!=81 and fn=='data':
+        ui.alert('Wrong Data File, Try again',title=w_title)
         window.destroy() # destroy main window
         main_win() # reopen main window
-
+    elif cols!=83 and fn=='gt':
+        ui.alert('Wrong Grant Tracker File, Try again', title=w_title)
+        window.destroy()  # destroy main window
+        main_win()  # reopen main window
     return data
 def erase_txt():
     ui.sleep(2)
@@ -557,7 +556,6 @@ def main_win():
     global rnum
     # check if RHESYS is opend or not
     check(title)
-    # rnum=0
     # creation of control window
     control=tk.Tk()
     control.title(w_title)
@@ -566,7 +564,7 @@ def main_win():
     control.iconbitmap(app_icon)
     control.resizable(0,0)
 
-    # ask for the file name
+    # ask for data the file name
     ftypes=(
         ('Excel Workbook', '*.xlsx'),
         ('Excel 97- Excel 2003 Workbook', '*.xls')
@@ -577,10 +575,26 @@ def main_win():
     if file=='':
         ui.alert('You didn\'t selecte a file, exiting...', title=w_title)
         exit(0)
-    data=get_data(control,file)
+    data=get_data(control,file,'data')
     # storing ids into list_ids it is used to link index number
     list_ids = data['ID'].tolist()
     #-------------------------------------------------------------------------
+
+    # ask for grant tracker file
+    ftypes = (
+        ('Excel Workbook', '*.xlsx'),
+        ('Excel 97- Excel 2003 Workbook', '*.xls')
+    )
+    file = of.askopenfilename(title='Select Grant Tracker Excel File',
+                              filetypes=ftypes
+                              )
+    if file == '':
+        ui.alert('You didn\'t selecte a file, exiting...', title=w_title)
+        exit(0)
+    data_gt = get_data(control, file,'gt')
+    # storing ids into list_ids it is used to link index number
+    gt_list_ids = data_gt['ID'].tolist()
+
 
     # function to copy data to clip board
     def copydata(data):
@@ -594,8 +608,9 @@ def main_win():
         global rnum # to change main rnum variable
         try:
             id_number = int(search_id_number.get())
-            rnum=list_ids.index(id_number)
-            print(rnum)
+            rnum=list_ids.index(id_number) # record number for data
+            rnum_gt=gt_list_ids.index(id_number) # record number for grant tracker
+
             # project title
             record=str(data['Project title'][rnum])
             if record!='nan':
@@ -605,30 +620,44 @@ def main_win():
                 entry_title = tk.Entry(textvariable=pr_title_var)
                 entry_title.grid(row=2,columnspan=2,sticky=tk.E+tk.W)
                 entry_title['state'] = 'disabled'
-
+                # function biding
+                entry_title.bind("<Button-1>", lambda a: copydata(pr_title_var))
+                # scrollbar
+                sb_title = tk.Scrollbar(orient='horizontal', width=10)
+                sb_title.grid(row=3, columnspan=2, sticky=tk.E + tk.W)
+                entry_title.config(xscrollcommand=sb_title.set)
+                sb_title.config(command=entry_title.xview)
 
             # project description label
             record=str(data['Project description'][rnum])
             if record!='nan':
-                lbl_des = tk.Label(text='Project Description:').grid(row=3, column=0,sticky=tk.W)
+                lbl_des = tk.Label(text='Project Description:').grid(row=4, column=0,sticky=tk.W)
                 pr_des_var = tk.StringVar()  # project description
                 pr_des_var.set(record)
                 entry_des = tk.Entry(textvariable=pr_des_var)
-                entry_des.grid(row=4,columnspan=2,sticky=tk.E+tk.W)
+                entry_des.grid(row=5,columnspan=2,sticky=tk.E+tk.W)
                 entry_des['state'] = 'disabled'
-
+                # function bidning
+                entry_des.bind("<Button-1>", lambda a: copydata(pr_des_var))
+                # scrollbar
+                sb_des = tk.Scrollbar(orient='horizontal', width=10)
+                sb_des.grid(row=6, columnspan=2, sticky=tk.E + tk.W)
+                entry_des.config(xscrollcommand=sb_des.set)
+                sb_des.config(command=entry_des.xview)
             # update project start label
             record=str(data['Start date'][rnum])
             if record!='nan':
                 record=record.split(' ')[0]
                 record=record.split('-')
                 record = record[2] + '/' + record[1] + '/' + record[0]
-                lbl_pstart = tk.Label(text='Project Start:').grid(row=5, column=0,sticky=tk.W)
+                lbl_pstart = tk.Label(text='Project Start:').grid(row=7, column=0,sticky=tk.W)
                 pr_start_var = tk.StringVar()  # project start date
                 pr_start_var.set(record)
                 entry_start = tk.Entry(textvariable=pr_start_var)
-                entry_start.grid(row=6,columnspan=2,sticky=tk.E+tk.W)
+                entry_start.grid(row=8,columnspan=2,sticky=tk.E+tk.W)
                 entry_start['state']='disabled'
+                # function binding
+                entry_start.bind("<Button-1>", lambda a: copydata(pr_start_var))
 
             # update project end label
             record=str(data['End date'][rnum])
@@ -636,52 +665,62 @@ def main_win():
                 record = record.split(' ')[0]
                 record = record.split('-')
                 record = record[2] + '/' + record[1] + '/' + record[0]
-                lbl_pend = tk.Label(text='Project End:').grid(row=7,sticky=tk.W)
+                lbl_pend = tk.Label(text='Project End:').grid(row=9,sticky=tk.W)
                 pr_end_var = tk.StringVar()  # project end date
                 pr_end_var.set(record)
                 entry_end = tk.Entry(textvariable=pr_end_var)
-                entry_end.grid(row=8,columnspan=2,sticky=tk.E+tk.W)
+                entry_end.grid(row=10,columnspan=2,sticky=tk.E+tk.W)
                 entry_end['state'] = 'disabled'
+                # function binding
+                entry_end.bind("<Button-1>", lambda a: copydata(pr_end_var))
 
             # update % research label
             record=str(data['% Research'][rnum])
             if record!='nan':
-                lbl_rpercent = tk.Label(text='% Research:').grid(row=9,sticky=tk.W)
+                lbl_rpercent = tk.Label(text='% Research:').grid(row=11,sticky=tk.W)
                 pr_rpercent_var = tk.StringVar()  # % research
                 pr_rpercent_var.set(record)
                 entry_rpercent = tk.Entry(textvariable=pr_rpercent_var)
-                entry_rpercent.grid(row=10,columnspan=2,sticky=tk.E+tk.W)
+                entry_rpercent.grid(row=12,columnspan=2,sticky=tk.E+tk.W)
                 entry_rpercent['state'] = 'disabled'  # entry box must be enabled to insert data
+                # function binding
+                entry_rpercent.bind("<Button-1>", lambda a: copydata(pr_rpercent_var))
 
             # update levy label
             record=str(data['Overheads'][rnum])
             if record!='nan':
-                lbl_levy = tk.Label(text='Levy:').grid(row=11,sticky=tk.W)
+                lbl_levy = tk.Label(text='Levy:').grid(row=13,sticky=tk.W)
                 pr_levy_var = tk.StringVar()  # levy
                 pr_levy_var.set(record)
                 entry_levy = tk.Entry(textvariable=pr_levy_var)
-                entry_levy.grid(row=12,columnspan=2,sticky=tk.E+tk.W)
+                entry_levy.grid(row=14,columnspan=2,sticky=tk.E+tk.W)
                 entry_levy['state'] = 'disabled'
+                # function binding
+                entry_levy.bind("<Button-1>", lambda a: copydata(pr_levy_var))
 
             # update rdo/bdo label
             record=str(data['BD contact'][rnum])
             if record!='nan':
-                lbl_rdo_bdo = tk.Label(text='RDO/BDO:').grid(row=13,sticky=tk.W)
+                lbl_rdo_bdo = tk.Label(text='RDO/BDO:').grid(row=15,sticky=tk.W)
                 pr_rdobdo_var = tk.StringVar()  # project rdo bdo
                 pr_rdobdo_var.set(record)
                 entry_rdobdo = tk.Entry(textvariable=pr_rdobdo_var)
-                entry_rdobdo.grid(row=14,columnspan=2,sticky=tk.E+tk.W)
+                entry_rdobdo.grid(row=16,columnspan=2,sticky=tk.E+tk.W)
                 entry_rdobdo['state'] = 'disabled'
+                # function binding
+                entry_rdobdo.bind("<Button-1>", lambda a: copydata(pr_rdobdo_var))
 
             # update ip ownership label
             record=str(data['Project IP arrangement'][rnum])
             if record != 'nan':
-                lbl_ipowner = tk.Label(text='IP ownership:').grid(row=15,sticky=tk.W)
+                lbl_ipowner = tk.Label(text='IP ownership:').grid(row=17,sticky=tk.W)
                 pr_ipowner_var = tk.StringVar()  # ip owner
                 pr_ipowner_var.set(record)
                 entry_ipowner = tk.Entry(textvariable=pr_ipowner_var)
-                entry_ipowner.grid(row=16,columnspan=2,sticky=tk.E+tk.W)
+                entry_ipowner.grid(row=18,columnspan=2,sticky=tk.E+tk.W)
                 entry_ipowner['state'] = 'disabled'
+                # function binding
+                entry_ipowner.bind("<Button-1>", lambda a: copydata(pr_ipowner_var))
 
             # update chief investigator label
             record=str(data['Researcher name'][rnum])
@@ -692,78 +731,55 @@ def main_win():
                 for i in record:
                     if not (i.isnumeric()):
                         r_name.append(i)  # add all researcher names to r_name
-                print(r_name)
-                lbl_ciname = tk.Label(text='Chief Investigator:').grid(row=17,sticky=tk.W)
+                researchers=''
+                for i in r_name:
+                    researchers=researchers+i+','
+                researchers=researchers.rstrip(',')
+                lbl_ciname = tk.Label(text='Chief Investigator:').grid(row=19,sticky=tk.W)
                 pr_ci_var = tk.StringVar()  # project chief investigator
-                pr_ci_var.set(record)
+                pr_ci_var.set(researchers)
                 entry_ci = tk.Entry(textvariable=pr_ci_var)
-                entry_ci.grid(row=18,columnspan=2,sticky=tk.E+tk.W)
+                entry_ci.grid(row=20,columnspan=2,sticky=tk.E+tk.W)
                 entry_ci['state'] = 'disabled'
+                # function binding
+                entry_ci.bind("<Button-1>", lambda a: copydata(pr_ci_var))
 
             # update name of school label
             record=str(data['School/Institute/Centre'][rnum])
             if record!='nan':
-                lbl_sch_cen = tk.Label(text='Name School or Center:').grid(row=19,sticky=tk.W)
+                lbl_sch_cen = tk.Label(text='Name School or Center:').grid(row=21,sticky=tk.W)
                 pr_schcen_var = tk.StringVar()  # project school/center
                 pr_schcen_var.set(record)
                 entry_schcen = tk.Entry(textvariable=pr_schcen_var)
-                entry_schcen.grid(row=20,columnspan=2,sticky=tk.E+tk.W)
+                entry_schcen.grid(row=22,columnspan=2,sticky=tk.E+tk.W)
                 entry_schcen['state'] = 'disabled'
+                # function binding
+                entry_schcen.bind("<Button-1>", lambda a: copydata(pr_schcen_var))
+        # ------------------------------------------------------------------------
+            # grant  information
+            print(data_gt.info())
+            # ----------------------------------------
+            record=str(data_gt['Project description']) # --> Grant Description
+            if record!='nan':
+                lbl_gt_des=tk.Label(text='Grant Description:').grid(row=1,column=1,sticky=tk.W)
+                gt_des_var=tk.StringVar()
+                gt_des_var.set(record)
+                entry_gt_des=tk.Entry(textvariable=gt_des_var)
+                entry_gt_des.grid(row=2,column=1)
 
-            # connecting functions with all entry box
-            # these functions will copy data to clip board
-            entry_title.bind("<Button-1>", lambda a: copydata(pr_title_var))
-            entry_des.bind("<Button-1>", lambda a: copydata(pr_des_var))
-            entry_start.bind("<Button-1>", lambda a: copydata(pr_start_var))
-            entry_end.bind("<Button-1>", lambda a: copydata(pr_end_var))
-            entry_rpercent.bind("<Button-1>", lambda a: copydata(pr_rpercent_var))
-            entry_levy.bind("<Button-1>", lambda a: copydata(pr_levy_var))
-            entry_rdobdo.bind("<Button-1>", lambda a: copydata(pr_rdobdo_var))
-            entry_ipowner.bind("<Button-1>", lambda a: copydata(pr_ipowner_var))
-            entry_ci.bind("<Button-1>", lambda a: copydata(pr_ci_var))
-            entry_schcen.bind("<Button-1>", lambda a: copydata(pr_schcen_var))
-
-        except:
-            pass
+            'Partner organisation'  # --> Funder
+            ''
+        # ----------------------------------------
+        except Exception as x:
+            print(x)
+            ui.alert('Record Id not found!',w_title)
 
     # search entry box
     lbl_search=tk.Label(text='Search Id:').grid(row=0,column=0,sticky=tk.W)
     search_id_number = tk.StringVar()
     search_text = tk.Entry(text='Id:', textvariable=search_id_number).grid(row=0, column=1)
     search_btn=tk.Button(text='Search',command=search_update).grid(row=0,column=3,sticky=tk.E)
-    # ------------------------------------------------------------------------
-
-    # ------------------------------------------------------------------------
-    # showing processing icon
-    #img_pro=tk.PhotoImage(file='img/process.png')
-    #pro_img=tk.Label(control,image='',text='Ready',compound=tk.TOP)
-    #pro_img.grid(row=0, column=1)
-
-    # -------
-    #lbl_frame2=tk.LabelFrame(control,text='Fill Data')
-    #lbl_frame2.grid(row=21)
-    #def start_filling_more():
-        #pro_img['image'] = img_pro
-        #pro_img['text'] = 'Please wait...'
-        #control.update()
-        #fill_more(data,btn_fill_more)
-        #pro_img['image'] = ''
-        #pro_img['text'] = 'Ready'
-        #control.update()
-    #btn_fill_more = tk.Button(lbl_frame2,state='disabled', text='Fill More', command=start_filling_more)#lambda: fill_more(data,btn_fill_more))
-    #btn_fill_more.grid(row=0, column=1) # here we need to put this button separately into grid because we are using it
-    # as an argument
-    # show processing icon
-    #def start_filling():
-        #pro_img['image']=img_pro
-        #pro_img['text']='Please wait...'
-        #control.update()
-        #fill_project(data, btn_fill_more)
-        #pro_img['image']=''
-        #pro_img['text'] = 'Ready'
-        #control.update()
-    #btn_fill_pro=tk.Button(lbl_frame2,text='Fill Project',command=start_filling).grid(row=0,column=0)
-    exit_btn=tk.Button(text='Close',command=shut).grid(row=21,column=1)
+    exit_btn=tk.Button(text='Close',command=shut).grid(row=23,column=1)
     # configuration to keep control window always on top
     control.attributes('-topmost',True)
     control.mainloop()
